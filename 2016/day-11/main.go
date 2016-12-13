@@ -33,23 +33,44 @@ func main() {
 	// The third floor contains nothing relevant.
 	// The fourth floor contains nothing relevant.
 	// objects = []Object{
-	// 	Object{1, 'O', 'G'},
-	// 	Object{1, 'T', 'G'},
-	// 	Object{1, 'T', 'M'},
-	// 	Object{1, 'R', 'G'},
-	// 	Object{1, 'U', 'G'},
-	// 	Object{1, 'U', 'M'},
-	// 	Object{1, 'C', 'G'},
-	// 	Object{1, 'C', 'M'},
+	// Object{1, 'O', 'G'},
+	// Object{1, 'T', 'G'},
+	// Object{1, 'T', 'M'},
+	// Object{1, 'R', 'G'},
+	// Object{1, 'U', 'G'},
+	// Object{1, 'U', 'M'},
+	// Object{1, 'C', 'G'},
+	// Object{1, 'C', 'M'},
 
-	// 	Object{2, 'O', 'M'},
-	// 	Object{2, 'R', 'M'},
+	// Object{2, 'O', 'M'},
+	// Object{2, 'R', 'M'},
 	// }
 	// possibleElements = []rune{'O', 'T', 'R', 'U', 'C'}
 
+	// The first floor contains a promethium generator and a promethium-compatible microchip.
+	// The second floor contains a cobalt generator, a curium generator, a ruthenium generator, and a plutonium generator.
+	// The third floor contains a cobalt-compatible microchip, a curium-compatible microchip, a ruthenium-compatible microchip, and a plutonium-compatible microchip.
+	// The fourth floor contains nothing relevant.
+	// objects = []Object{
+	// Object{1, '1', 'G'},
+	// Object{1, '1', 'M'},
+
+	// Object{2, '2', 'G'},
+	// Object{2, '3', 'G'},
+	// Object{2, '4', 'G'},
+	// Object{2, '5', 'G'},
+
+	// Object{3, '2', 'M'},
+	// Object{3, '3', 'M'},
+	// Object{3, '4', 'M'},
+	// Object{3, '5', 'M'},
+	// }
+	// possibleElements = []rune{'1', '2', '3', '4', '5'}
+
 	printObjects(objects, 1)
 	for i := 0; ; i++ {
-		success := step(objects, 1, 0, i, State{})
+		seenStates = []State{}
+		success := step(objects, 1, 0, i, State{}, []State{})
 		if success {
 			fmt.Printf("Minimum number of steps: %d\n", i)
 			break
@@ -59,78 +80,117 @@ func main() {
 	}
 }
 
-func step(objects []Object, elevatorFloor, stepCount, stepCountLimit int, lastState State) bool {
+func step(objects []Object, elevatorFloor, stepCount, stepCountLimit int, lastState State, history []State) bool {
 	if stepCount > stepCountLimit {
 		return false
 	}
-	currentState := State{elevatorFloor, genPairs(objects)}
-	if stateEqual(currentState, lastState) || seenBefore(currentState) {
-		return false
-	}
-	if isFailure(objects, elevatorFloor) {
-		updateState(currentState)
-		return false
-	}
-	//fmt.Printf("step(floor: %d, count: %d)\n", elevatorFloor, stepCount)
-	//printObjects(objects, elevatorFloor)
+	currentState := State{elevatorFloor, genPairs(objects), objects, stepCount}
 
+	// have seen this state before?
+	matched := matchState(currentState)
+	if matched != -1 {
+		// when we got here before, it was more efficient
+		if seenStates[matched].Steps <= stepCount {
+			return false
+		}
+		seenStates[matched].Steps = stepCount
+	} else {
+		seenStates = append(seenStates, currentState)
+	}
+
+	// fmt.Printf("step(floor: %d, count: %d)\n", elevatorFloor, stepCount)
+	// printObjects(objects, elevatorFloor)
+
+	// print success
 	if isSuccess(objects) {
+		fmt.Println()
+		for i, s := range history {
+			fmt.Printf("Step %d\n", i)
+			printObjects(s.Objects, s.ElevatorFloor)
+		}
+		fmt.Println()
+
 		return true
 	}
 
-	// Move elevator with single object
-	for i, obj := range objects {
-		if obj.Floor != elevatorFloor {
-			continue
-		}
-		if elevatorFloor > 1 {
-			s := step(moveObjectDown(objects, i), elevatorFloor-1, stepCount+1, stepCountLimit, currentState)
-			if s {
-				return true
-			}
-		}
-		if elevatorFloor < 4 {
-			s := step(moveObjectUp(objects, i), elevatorFloor+1, stepCount+1, stepCountLimit, currentState)
-			if s {
-				return true
-			}
-		}
-	}
+	history = append(history, currentState)
 
-	// Move elevator with two objects
+	// Move up
 	for i, obj1 := range objects {
 		for j, obj2 := range objects {
-			if i == j {
-				//same object
-				continue
-			}
 			if obj1.Floor != elevatorFloor || obj2.Floor != elevatorFloor {
 				continue
 			}
-			if elevatorFloor > 1 {
-				s := step(move2ObjectDown(objects, i, j), elevatorFloor-1, stepCount+1, stepCountLimit, currentState)
-				if s {
-					return true
+			if elevatorFloor == 4 {
+				continue
+			}
+
+			// no need to move one object up if you can move two up
+			failed := true
+			if i != j {
+				move2Up := move2ObjectUp(objects, i, j)
+				if !isFailure(move2Up, elevatorFloor+1) && !isFailure(move2Up, elevatorFloor) {
+					failed = false
+					s := step(move2Up, elevatorFloor+1, stepCount+1, stepCountLimit, currentState, history)
+					if s {
+						return true
+					}
 				}
 			}
-			if elevatorFloor < 4 {
-				s := step(move2ObjectUp(objects, i, j), elevatorFloor+1, stepCount+1, stepCountLimit, currentState)
-				if s {
-					return true
+
+			if failed {
+				move1Up := moveObjectUp(objects, i)
+				if !isFailure(move1Up, elevatorFloor+1) && !isFailure(move1Up, elevatorFloor) {
+					s := step(move1Up, elevatorFloor+1, stepCount+1, stepCountLimit, currentState, history)
+					if s {
+						return true
+					}
 				}
 			}
 		}
 	}
-	return false
-}
 
-func isLegalMove(objects []Object, elevatorFloor, stepCount, stepCountLimit int) bool {
+	// Move down
+	for i, obj1 := range objects {
+		for j, obj2 := range objects {
+			if obj1.Floor != elevatorFloor || obj2.Floor != elevatorFloor {
+				continue
+			}
+			if elevatorFloor <= 1 {
+				continue
+			}
+
+			// no need to move two object down if you can move one down
+			failed := true
+			move1Down := moveObjectDown(objects, i)
+			if !isFailure(move1Down, elevatorFloor-1) && !isFailure(move1Down, elevatorFloor) {
+				failed = false
+				s := step(move1Down, elevatorFloor-1, stepCount+1, stepCountLimit, currentState, history)
+				if s {
+					return true
+				}
+			}
+
+			if failed && i != j {
+				move2Down := move2ObjectDown(objects, i, j)
+				if !isFailure(move2Down, elevatorFloor-1) && !isFailure(move2Down, elevatorFloor) {
+					s := step(move2Down, elevatorFloor-1, stepCount+1, stepCountLimit, currentState, history)
+					if s {
+						return true
+					}
+				}
+			}
+		}
+	}
+
 	return false
 }
 
 type State struct {
 	ElevatorFloor int
 	Pairs         []Pair
+	Objects       []Object
+	Steps         int
 }
 type Pair struct {
 	GeneratorFloor int
@@ -163,17 +223,13 @@ func genPairs(objects []Object) []Pair {
 	return pairs
 }
 
-func updateState(state State) {
-	seenStates = append(seenStates, state)
-}
-
-func seenBefore(stateA State) bool {
-	for _, stateB := range seenStates {
+func matchState(stateA State) int {
+	for i, stateB := range seenStates {
 		if stateEqual(stateA, stateB) {
-			return true
+			return i
 		}
 	}
-	return false
+	return -1
 }
 
 func stateEqual(a, b State) bool {
