@@ -23,16 +23,3 @@ def test_part_1(test_input, expected):
 ])
 def test_part_2(test_input, expected):
     assert part_2(test_input.splitlines()) == expected
-
-
-# @pytest.mark.parametrize("test_input,expected", [
-#     ("<>", 0),
-#     ("<random characters>", 17),
-#     ("<<<<>", 3),
-#     ("<{!>}>", 2),
-#     ("<!!>", 0),
-#     ("<!!!>>", 0),
-#     ("<{o\"i!a,<{i<a>", 10),
-# ])
-# def test_part_2(test_input, expected):
-#     assert part_2(test_input) == expected
